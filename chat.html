@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <?!= include('styles'); ?>
+</head>
+<body>
+
+  <main id="chatbox">
+    <div class="loading">Loading chat...</div>
+  </main>
+
+  <footer id="inputArea">
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+    <button id="imageButton" class="chat-button" title="Attach Image">+</button>
+    <input type="text" id="messageInput" placeholder="Message...">
+    <button id="sendButton" class="chat-button" title="Send">↑</button>
+  </footer>
+
+  <?!= include('utils'); ?>
+
+</body>
+</html>

@@ -1,0 +1,229 @@
+<script>
+  // --- DOM Elements ---
+  const chatbox = document.getElementById('chatbox');
+  const messageInput = document.getElementById('messageInput');
+  const sendButton = document.getElementById('sendButton');
+  const imageButton = document.getElementById('imageButton');
+  const imageInput = document.getElementById('imageInput');
+  const userName = '<?= userName ?>';
+
+  // --- State ---
+  let lastRenderedTimestamp = null; // To track the last message rendered
+  let pollingInterval;
+
+  // --- Functions ---
+
+  /**
+   * Formats a date string into a simple HH:MM format.
+   * @param {string | Date} dateString The date to format.
+   * @returns {string} The formatted time.
+   */
+  function formatTimestamp(dateString) {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      // Use Intl for better locale support, ensuring two digits.
+      return new Intl.DateTimeFormat('default', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    } catch (e) {
+      console.error('Invalid timestamp:', dateString);
+      return '';
+    }
+  }
+
+  /**
+   * Renders only the new messages to the chatbox to prevent flickering.
+   * @param {Array<Object>} messages The array of message objects from the server.
+   */
+  function renderMessages(messages) {
+    const newMessages = messages.filter(msg =>
+      !lastRenderedTimestamp || new Date(msg.timestamp) > new Date(lastRenderedTimestamp)
+    );
+
+    if (newMessages.length === 0 && chatbox.querySelector('.loading')) {
+      chatbox.innerHTML = '<div class="loading">No messages yet. Start the conversation!</div>';
+    } else if (newMessages.length > 0) {
+      const loadingDiv = chatbox.querySelector('.loading');
+      if (loadingDiv) loadingDiv.remove();
+
+      newMessages.forEach(msg => {
+        const isSent = msg.user === userName;
+
+        const msgContainer = document.createElement('div');
+        msgContainer.classList.add('message-container');
+        if (isSent) {
+          msgContainer.classList.add('sent');
+        }
+
+        const msgElement = document.createElement('div');
+        msgElement.classList.add('message');
+
+        // Render image or text
+        if (msg.imageLink) {
+          const img = document.createElement('img');
+          img.src = msg.imageLink;
+          img.alt = 'User image';
+          img.onerror = () => { img.alt = 'Image failed to load.'; };
+          msgElement.appendChild(img);
+        } else {
+          const text = document.createElement('p');
+          text.classList.add('text-content');
+          text.textContent = msg.message;
+          msgElement.appendChild(text);
+        }
+
+        msgContainer.appendChild(msgElement);
+
+        // Add timestamp below the message bubble
+        const timeElement = document.createElement('div');
+        timeElement.classList.add('timestamp');
+        timeElement.textContent = formatTimestamp(msg.timestamp);
+        msgContainer.appendChild(timeElement);
+
+        chatbox.appendChild(msgContainer);
+      });
+
+      lastRenderedTimestamp = newMessages[newMessages.length - 1].timestamp;
+
+      // Scroll to the latest message smoothly
+      chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  /**
+   * Fetches messages from the server.
+   */
+  function loadMessages() {
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.ok) {
+          renderMessages(response.messages);
+        } else {
+          showError('Error fetching messages: ' + response.error);
+        }
+      })
+      .withFailureHandler(error => {
+        showError('Connection error. Could not load messages.');
+        console.error("getMessages failure:", error);
+      })
+      .getMessages();
+  }
+
+  /**
+   * Handles sending a text message.
+   */
+  function handleSendMessage() {
+    const messageText = messageInput.value.trim();
+    if (!messageText) return;
+
+    setSendingState(true);
+
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.ok) {
+          messageInput.value = '';
+          updateSendButtonState();
+          loadMessages(); // Immediately poll for the new message
+        } else {
+          alert('Error: ' + response.error);
+        }
+        setSendingState(false);
+      })
+      .withFailureHandler(error => {
+        alert('A connection error occurred. Please try again.');
+        console.error('sendMessage failure:', error);
+        setSendingState(false);
+      })
+      .sendMessage(userName, messageText);
+  }
+
+  /**
+   * Handles the image selection and upload process.
+   */
+  function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      alert("File is too large. Max size is 5MB.");
+      return;
+    }
+
+    setUploadingState(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const fileData = reader.result.split(',')[1];
+      const fileInfo = { fileName: file.name, mimeType: file.type, fileData: fileData };
+
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response.ok) {
+            loadMessages(); // Refresh to show the new image
+          } else {
+            alert('Upload Error: ' + response.error);
+          }
+          setUploadingState(false);
+        })
+        .withFailureHandler(error => {
+          alert('A connection error occurred during upload.');
+          console.error('uploadImage failure:', error);
+          setUploadingState(false);
+        })
+        .uploadImage(userName, fileInfo);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // --- UI Helper Functions ---
+
+  function setSendingState(isSending) {
+    messageInput.disabled = isSending;
+    sendButton.disabled = isSending;
+  }
+
+  function setUploadingState(isUploading) {
+    imageButton.disabled = isUploading;
+    imageButton.textContent = isUploading ? '...' : '+';
+    // Reset file input value to allow selecting the same file again
+    imageInput.value = '';
+  }
+
+  function updateSendButtonState() {
+    sendButton.disabled = messageInput.value.trim() === '';
+  }
+
+  function showError(message) {
+      if (!chatbox.querySelector('.error')) {
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'loading error';
+          errorDiv.textContent = message;
+          chatbox.appendChild(errorDiv);
+      }
+  }
+
+  // --- Event Listeners ---
+  sendButton.addEventListener('click', handleSendMessage);
+  imageButton.addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', handleImageUpload);
+
+  messageInput.addEventListener('keypress', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Prevent new line in some browsers
+      handleSendMessage();
+    }
+  });
+
+  messageInput.addEventListener('input', updateSendButtonState);
+
+  // --- Initial Load & Polling ---
+  document.addEventListener('DOMContentLoaded', () => {
+    loadMessages();
+    pollingInterval = setInterval(loadMessages, 4000); // Poll every 4 seconds
+    updateSendButtonState(); // Initial state
+    messageInput.focus(); // Focus input on load
+  });
+
+</script>
