@@ -51,7 +51,6 @@ function getMessages() {
     const values = range.getValues();
     const messages = [];
 
-    // Skip header row (i=0)
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
       if (row.join('').trim() === '') continue;
@@ -80,12 +79,7 @@ function sendMessage(userName, messageText) {
   }
   try {
     const sheet = getSheet();
-    sheet.appendRow([
-      new Date(),
-      userName,
-      messageText.trim(),
-      ''
-    ]);
+    sheet.appendRow([ new Date(), userName, messageText.trim(), '' ]);
     return { ok: true };
   } catch (error) {
     Logger.log('Error in sendMessage: ' + error.toString());
@@ -107,22 +101,20 @@ function uploadImage(userName, fileInfo) {
 
     const decodedData = Utilities.base64Decode(fileInfo.fileData);
     const blob = Utilities.newBlob(decodedData, fileInfo.mimeType, fileInfo.fileName);
-
     const file = folder.createFile(blob);
+
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
+    // *** BUG FIX: Add a delay to allow Google Drive permissions to propagate. ***
+    // Sometimes, there's a short delay before a newly created file's sharing
+    // permissions are fully active. This pause ensures the link is valid.
+    Utilities.sleep(1500); // Pause for 1.5 seconds
+
     const fileId = file.getId();
-    // *** BUG FIX: Use a direct embeddable link for images ***
-    // The `uc?id=` format is more reliable for direct embedding in <img> tags.
     const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
 
     const sheet = getSheet();
-    sheet.appendRow([
-      new Date(),
-      userName,
-      '',
-      imageUrl
-    ]);
+    sheet.appendRow([ new Date(), userName, '', imageUrl ]);
 
     return { ok: true, imageLink: imageUrl };
 
