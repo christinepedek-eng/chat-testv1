@@ -1,14 +1,13 @@
 <style>
   /* ----- General Resets & Body ----- */
   :root {
-    --sent-bg: #0078FF;
+    --sent-bg: #007AFF; /* Apple Blue */
     --received-bg: #E5E5EA;
     --background-color: #FFFFFF;
     --text-dark: #000000;
     --text-light: #FFFFFF;
-    --text-meta: #6D6D72;
-    --input-bg: #F0F0F0;
-    --border-color: #E0E0E0;
+    --text-meta: #8E8E93; /* Lighter grey for timestamps */
+    --input-bg: #F5F5F7;
   }
 
   body {
@@ -18,24 +17,25 @@
     height: 100vh; /* Full viewport height */
     margin: 0;
     background-color: var(--background-color);
-    font-size: 17px; /* Larger base font for mobile */
+    font-size: 18px; /* Larger base font as requested */
     color: var(--text-dark);
+    -webkit-font-smoothing: antialiased; /* Smoother fonts on Apple devices */
   }
 
   /* ----- Chatbox & Messages ----- */
   #chatbox {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 16px 10px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px; /* Space between messages */
+    gap: 15px; /* More space between messages */
   }
 
   .message-container {
     display: flex;
     flex-direction: column;
-    max-width: 85%;
+    max-width: 80%;
     align-self: flex-start; /* Default: Received */
   }
 
@@ -44,36 +44,34 @@
   }
 
   .message {
-    padding: 10px 15px;
-    border-radius: 20px;
+    padding: 12px 18px;
+    border-radius: 22px; /* iMessage-like bubble radius */
     word-wrap: break-word;
-    line-height: 1.4;
+    line-height: 1.45;
   }
 
   /* Received Message Style */
   .message-container:not(.sent) .message {
     background-color: var(--received-bg);
     color: var(--text-dark);
-    border-top-left-radius: 4px; /* Give it a "tail" */
   }
 
   /* Sent Message Style */
   .message-container.sent .message {
     background-color: var(--sent-bg);
     color: var(--text-light);
-    border-top-right-radius: 4px; /* Give it a "tail" */
   }
 
   .message .text-content {
-    margin: 0;
+    margin: 0; /* Remove default paragraph margin */
   }
 
   /* Timestamp below the bubble */
   .timestamp {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-meta);
-    margin-top: 5px;
-    padding: 0 5px;
+    margin-top: 6px;
+    padding: 0 8px;
   }
 
   .message-container.sent .timestamp {
@@ -82,45 +80,55 @@
 
   .message img {
     max-width: 100%;
-    border-radius: 15px;
+    border-radius: 20px; /* Match bubble radius */
     display: block;
-    margin-top: 5px;
+    /* Images in messages don't need extra padding */
   }
+  .message-container .message img {
+    margin: -12px -18px; /* Fill the bubble */
+    width: calc(100% + 36px);
+    max-width: calc(100% + 36px);
+  }
+
 
   /* ----- Input Area ----- */
   #inputArea {
     display: flex;
-    align-items: center; /* Vertically center items */
-    padding: 10px;
+    align-items: center;
+    padding: 8px;
     background-color: var(--input-bg);
+    border-top: 1px solid #E5E5E5;
     flex-shrink: 0;
   }
 
   #messageInput {
     flex-grow: 1;
-    padding: 12px 18px;
+    padding: 14px 20px;
     border: none;
-    border-radius: 22px; /* Pill shape */
-    margin: 0 10px;
-    font-size: 17px; /* Match body font */
+    border-radius: 25px; /* Pill shape */
+    margin: 0 8px;
+    font-size: 18px; /* Match body font */
     background-color: white;
+    border: 1px solid #E5E5E5;
   }
   #messageInput:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--sent-bg);
+    border-color: var(--sent-bg);
+    box-shadow: 0 0 0 1px var(--sent-bg);
   }
 
-  /* Big, modern CTA buttons */
+  /* BIGGER, BOLDER CTA buttons */
   .chat-button {
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
+    width: 48px;   /* Much larger touch target */
+    height: 48px;  /* Much larger touch target */
     background-color: var(--sent-bg);
     color: white;
     border: none;
     border-radius: 50%;
     cursor: pointer;
-    font-size: 24px;
+    font-size: 28px; /* Larger icon */
+    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -128,11 +136,16 @@
     transition: transform 0.1s ease-out;
   }
   .chat-button:active {
-    transform: scale(0.9); /* Click feedback */
+    transform: scale(0.9);
   }
 
   #imageButton {
-    background-color: #34C759; /* A different color for attach */
+    background-color: var(--received-bg);
+    color: var(--text-meta);
+    font-size: 24px;
+  }
+  #sendButton {
+     padding-bottom: 2px; /* Visually center arrow */
   }
 
   /* ----- Utility ----- */
@@ -140,6 +153,6 @@
      text-align: center;
      color: var(--text-meta);
      padding: 20px;
-     font-size: 14px;
+     font-size: 15px;
   }
 </style>

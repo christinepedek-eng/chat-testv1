@@ -56,14 +56,11 @@ function getMessages() {
       const row = values[i];
       if (row.join('').trim() === '') continue;
 
-      // *** BUG FIX: Standardize the timestamp format ***
-      // Google Sheets can return dates in various formats.
-      // Converting to ISO string ensures a consistent format for the client-side JS.
       const timestampValue = row[COL.TIMESTAMP - 1];
       const timestamp = new Date(timestampValue).toISOString();
 
       messages.push({
-        timestamp: timestamp, // Use the standardized ISO string timestamp
+        timestamp: timestamp,
         user: row[COL.USER - 1],
         message: row[COL.MESSAGE - 1],
         imageLink: row[COL.IMAGELINK - 1]
@@ -115,7 +112,9 @@ function uploadImage(userName, fileInfo) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const fileId = file.getId();
-    const imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // *** BUG FIX: Use a direct embeddable link for images ***
+    // The `uc?id=` format is more reliable for direct embedding in <img> tags.
+    const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
 
     const sheet = getSheet();
     sheet.appendRow([
