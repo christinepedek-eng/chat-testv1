@@ -18,7 +18,7 @@
     height: 100vh;
     margin: 0;
     background-color: var(--background-color);
-    font-size: 18px; /* Base size for scaling */
+    font-size: 18px; /* Base size */
     color: var(--text-dark);
     -webkit-font-smoothing: antialiased;
   }
@@ -49,7 +49,7 @@
     border-radius: 35px;
     word-wrap: break-word;
     line-height: 1.45;
-    /* --- FONT SIZE INCREASED BY 150% (from 32px) --- */
+    /* --- FONT SIZE INCREASED BY 150% --- */
     font-size: 48px;
   }
 
@@ -89,24 +89,24 @@
     max-width: calc(100% + 56px);
   }
 
-  /* ----- Input Area - FINAL RESPONSIVE ----- */
+  /* ----- Input Area - FINAL ROBUST RESPONSIVE ----- */
   #inputArea {
     display: flex;
     align-items: center;
-    padding: 12px;
+    padding: 10px;
     background-color: var(--input-bg);
     border-top: 1px solid #E5E5E5;
     flex-shrink: 0;
-    gap: 12px;
+    gap: 10px;
   }
 
   #messageInput {
-    flex-grow: 1;
-    min-width: 0;
+    flex-grow: 1; /* This is key: it takes all available space */
+    min-width: 0;  /* This prevents it from overflowing */
     padding: 15px 25px;
     border: 1px solid #E5E5E5;
     border-radius: 40px;
-    font-size: 30px; /* Scaled input text */
+    font-size: 28px;
     background-color: white;
   }
   #messageInput:focus {
@@ -114,13 +114,11 @@
     border-color: var(--sent-bg);
   }
 
-  /* --- CTA BUTTONS INCREASED BY 200% & RESPONSIVE --- */
+  /* --- CTA BUTTONS INCREASED BY 200% --- */
   .chat-button {
-    flex-shrink: 0;
-    width: 25vw; /* Takes 25% of screen width */
-    height: 25vw; /* Creates a perfect circle */
-    max-width: 140px; /* Caps size on tablets/desktops */
-    max-height: 140px;
+    flex-shrink: 0; /* Buttons will not shrink */
+    width: 90px;
+    height: 90px;
 
     background-color: var(--sent-bg);
     color: white;
@@ -133,13 +131,7 @@
     justify-content: center;
     padding: 0;
     transition: transform 0.1s ease-out;
-    font-size: 12vw; /* Icon scales with the button */
-  }
-
-  @media (min-width: 560px) { /* On screens wider than 560px, cap the size */
-      .chat-button {
-          font-size: 70px;
-      }
+    font-size: 45px;
   }
 
   .chat-button:active {
@@ -148,9 +140,6 @@
 
   #imageButton {
     background-color: var(--button-green);
-  }
-  #sendButton {
-     padding-left: 2vw;
   }
 
   /* ----- Utility ----- */

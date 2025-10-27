@@ -99,25 +99,23 @@ function uploadImage(userName, fileInfo) {
       return { ok: false, error: 'Configuration error: Image folder not found.' };
     }
 
+    // *** FINAL BUG FIX: Ensure the PARENT FOLDER is public. ***
+    // This is the root cause. If the folder isn't public, no file inside it can be.
+    // This check runs every time to prevent future permission issues.
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
     const decodedData = Utilities.base64Decode(fileInfo.fileData);
     const blob = Utilities.newBlob(decodedData, fileInfo.mimeType, fileInfo.fileName);
     const file = folder.createFile(blob);
 
+    // Setting the file's sharing is still good practice, but the folder is key.
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const fileId = file.getId();
     const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
 
-    // *** FINAL BUG FIX: Actively "wake up" the link. ***
-    // Instead of passively waiting, we actively fetch the URL's headers.
-    // This forces Google's servers to resolve the permissions immediately.
-    // We use `muteHttpExceptions` so if it fails, it doesn't stop the script.
-    try {
-      UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true });
-    } catch (e) {
-      // Log the error but continue, as the main goal was to trigger the URL.
-      Logger.log("Ignored UrlFetchApp error during link activation: " + e.toString());
-    }
+    // The delay/fetch is no longer the primary fix, but kept as a fallback.
+    Utilities.sleep(1000);
 
     const sheet = getSheet();
     sheet.appendRow([ new Date(), userName, '', imageUrl ]);
