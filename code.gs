@@ -105,10 +105,10 @@ function uploadImage(userName, fileInfo) {
 
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    // *** BUG FIX: Add a delay to allow Google Drive permissions to propagate. ***
-    // Sometimes, there's a short delay before a newly created file's sharing
-    // permissions are fully active. This pause ensures the link is valid.
-    Utilities.sleep(1500); // Pause for 1.5 seconds
+    // *** BUG FIX: Increased delay to 3 seconds for permissions to propagate. ***
+    // This provides a much safer window for Google Drive's systems to sync
+    // the file's sharing permissions before the link is used.
+    Utilities.sleep(3000); // Pause for 3 seconds
 
     const fileId = file.getId();
     const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
