@@ -1,20 +1,19 @@
 // ----- CONFIGURATION -----
 const SHEET_NAME = 'ChatLog';
-const IMAGE_FOLDER_ID = '1GjAw2771ia45TCr96d24dzAWmMW1hsZ-'; // <-- ΒΑΛΕ ΕΔΩ ΤΟ ID ΤΟΥ ΦΑΚΕΛΟΥ ΑΠΟ ΤΟ ΒΗΜΑ 2!
+const IMAGE_FOLDER_ID = '1GjAw2771ia45TCr96d24dzAWmMW1hsZ-';
 
 // ----- SHEET COLUMNS -----
 const COL = {
   TIMESTAMP: 1,
   USER: 2,
   MESSAGE: 3,
-  IMAGELINK: 4
+  IMAGE_ID: 4
 };
 
-// ----- USER IDENTIFICATION (Simple Example) -----
-// Προσάρμοσέ το με τα δικά σας emails!
+// ----- USER IDENTIFICATION -----
 const USERS = {
-  'steliosgfx@gmail.com': 'Εσύ', // <-- ΒΑΛΕ ΤΟ EMAIL ΣΟΥ
-  'yorgooos@hotmail.com': 'Αδερφός' // <-- ΒΑΛΕ ΤΟ EMAIL ΤΟΥ ΑΔΕΡΦΟΥ ΣΟΥ
+  'steliosgfx@gmail.com': 'Εσύ',
+  'yorgooos@hotmail.com': 'Αδερφός'
 };
 
 // ---------------------------
@@ -22,28 +21,49 @@ const USERS = {
 // ---------------------------
 
 function doGet(e) {
+  if (e.parameter.image) {
+    return serveImage(e.parameter.image);
+  } else {
+    return serveChatPage();
+  }
+}
+
+function serveChatPage() {
   const userEmail = Session.getActiveUser().getEmail();
   const userName = USERS[userEmail] || userEmail;
 
   const tpl = HtmlService.createTemplateFromFile('chat');
   tpl.userName = userName;
+  // *** FINAL FIX: Pass the script URL to the template correctly ***
+  tpl.scriptUrl = ScriptApp.getService().getUrl();
+
   return tpl.evaluate()
     .setTitle('Chat App')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function serveImage(fileId) {
+  try {
+    const file = DriveApp.getFileById(fileId);
+    const blob = file.getBlob();
+    return ContentService.createOutput(blob).setMimeType(blob.getContentType());
+  } catch (error) {
+    Logger.log(`Error serving image ${fileId}: ${error.toString()}`);
+    return ContentService.createTextOutput('Image not found').setMimeType(ContentService.MimeType.TEXT);
+  }
 }
 
 function getSheet() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) {
     const newSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(SHEET_NAME);
-    newSheet.appendRow(['Timestamp', 'User', 'Message', 'Image Link']);
+    newSheet.appendRow(['Timestamp', 'User', 'Message', 'Image ID']);
     newSheet.setFrozenRows(1);
     return newSheet;
   }
   return sheet;
 }
 
-// Function called by client-side JS to get messages
 function getMessages() {
   try {
     const sheet = getSheet();
@@ -55,14 +75,13 @@ function getMessages() {
       const row = values[i];
       if (row.join('').trim() === '') continue;
 
-      const timestampValue = row[COL.TIMESTAMP - 1];
-      const timestamp = new Date(timestampValue).toISOString();
+      const timestamp = new Date(row[COL.TIMESTAMP - 1]).toISOString();
 
       messages.push({
         timestamp: timestamp,
         user: row[COL.USER - 1],
         message: row[COL.MESSAGE - 1],
-        imageLink: row[COL.IMAGELINK - 1]
+        imageId: row[COL.IMAGE_ID - 1]
       });
     }
     return { ok: true, messages: messages };
@@ -72,14 +91,12 @@ function getMessages() {
   }
 }
 
-// Function called by client-side JS to send a text message
 function sendMessage(userName, messageText) {
   if (!userName || !messageText || messageText.trim() === '') {
     return { ok: false, error: 'User or message missing.' };
   }
   try {
-    const sheet = getSheet();
-    sheet.appendRow([ new Date(), userName, messageText.trim(), '' ]);
+    getSheet().appendRow([ new Date(), userName, messageText.trim(), '' ]);
     return { ok: true };
   } catch (error) {
     Logger.log('Error in sendMessage: ' + error.toString());
@@ -87,7 +104,6 @@ function sendMessage(userName, messageText) {
   }
 }
 
-// Function called by client-side JS to upload an image
 function uploadImage(userName, fileInfo) {
   if (!userName || !fileInfo || !fileInfo.mimeType || !fileInfo.fileData) {
      return { ok: false, error: 'Missing image data.' };
@@ -95,32 +111,20 @@ function uploadImage(userName, fileInfo) {
   try {
     const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
     if (!folder) {
-      Logger.log(`Critical Error: The folder with ID "${IMAGE_FOLDER_ID}" was not found.`);
+      Logger.log(`Critical Error: Folder with ID "${IMAGE_FOLDER_ID}" not found.`);
       return { ok: false, error: 'Configuration error: Image folder not found.' };
     }
 
-    // *** FINAL BUG FIX: Ensure the PARENT FOLDER is public. ***
-    // This is the root cause. If the folder isn't public, no file inside it can be.
-    // This check runs every time to prevent future permission issues.
     folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const decodedData = Utilities.base64Decode(fileInfo.fileData);
     const blob = Utilities.newBlob(decodedData, fileInfo.mimeType, fileInfo.fileName);
     const file = folder.createFile(blob);
-
-    // Setting the file's sharing is still good practice, but the folder is key.
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
     const fileId = file.getId();
-    const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
 
-    // The delay/fetch is no longer the primary fix, but kept as a fallback.
-    Utilities.sleep(1000);
+    getSheet().appendRow([ new Date(), userName, '', fileId ]);
 
-    const sheet = getSheet();
-    sheet.appendRow([ new Date(), userName, '', imageUrl ]);
-
-    return { ok: true, imageLink: imageUrl };
+    return { ok: true, imageId: fileId };
 
   } catch (error) {
     Logger.log('Error in uploadImage: ' + error.toString());
@@ -128,7 +132,6 @@ function uploadImage(userName, fileInfo) {
   }
 }
 
-// Helper to include HTML partials
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }

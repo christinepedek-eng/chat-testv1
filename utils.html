@@ -8,21 +8,17 @@
   const userName = '<?= userName ?>';
 
   // --- State ---
-  let lastRenderedTimestamp = null; // To track the last message rendered
+  let lastRenderedTimestamp = null;
   let pollingInterval;
+  // *** FINAL FIX: Read the script URL safely from the HTML data attribute ***
+  const SCRIPT_URL = document.getElementById('scriptUrl').getAttribute('data-url');
 
   // --- Functions ---
 
-  /**
-   * Formats a date string into a simple HH:MM format.
-   * @param {string | Date} dateString The date to format.
-   * @returns {string} The formatted time.
-   */
   function formatTimestamp(dateString) {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
-      // Use Intl for better locale support, ensuring two digits.
       return new Intl.DateTimeFormat('default', {
         hour: '2-digit',
         minute: '2-digit',
@@ -34,41 +30,33 @@
     }
   }
 
-  /**
-   * Renders only the new messages to the chatbox to prevent flickering.
-   * @param {Array<Object>} messages The array of message objects from the server.
-   */
   function renderMessages(messages) {
     const newMessages = messages.filter(msg =>
       !lastRenderedTimestamp || new Date(msg.timestamp) > new Date(lastRenderedTimestamp)
     );
 
     if (newMessages.length === 0 && chatbox.querySelector('.loading')) {
-      chatbox.innerHTML = '<div class="loading">No messages yet. Start the conversation!</div>';
+      chatbox.innerHTML = '<div class="loading">No messages yet.</div>';
     } else if (newMessages.length > 0) {
       const loadingDiv = chatbox.querySelector('.loading');
       if (loadingDiv) loadingDiv.remove();
 
       newMessages.forEach(msg => {
         const isSent = msg.user === userName;
-
         const msgContainer = document.createElement('div');
         msgContainer.classList.add('message-container');
-        if (isSent) {
-          msgContainer.classList.add('sent');
-        }
+        if (isSent) msgContainer.classList.add('sent');
 
         const msgElement = document.createElement('div');
         msgElement.classList.add('message');
 
-        // Render image or text
-        if (msg.imageLink) {
+        if (msg.imageId) {
           const img = document.createElement('img');
-          img.src = msg.imageLink;
+          img.src = SCRIPT_URL + '?image=' + msg.imageId;
           img.alt = 'User image';
           img.onerror = () => { img.alt = 'Image failed to load.'; };
           msgElement.appendChild(img);
-        } else {
+        } else if (msg.message) {
           const text = document.createElement('p');
           text.classList.add('text-content');
           text.textContent = msg.message;
@@ -76,45 +64,31 @@
         }
 
         msgContainer.appendChild(msgElement);
-
-        // Add timestamp below the message bubble
         const timeElement = document.createElement('div');
         timeElement.classList.add('timestamp');
         timeElement.textContent = formatTimestamp(msg.timestamp);
         msgContainer.appendChild(timeElement);
-
         chatbox.appendChild(msgContainer);
       });
 
       lastRenderedTimestamp = newMessages[newMessages.length - 1].timestamp;
-
-      // Scroll to the latest message smoothly
       chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
     }
   }
 
-  /**
-   * Fetches messages from the server.
-   */
   function loadMessages() {
     google.script.run
       .withSuccessHandler(response => {
-        if (response.ok) {
-          renderMessages(response.messages);
-        } else {
-          showError('Error fetching messages: ' + response.error);
-        }
+        if (response.ok) renderMessages(response.messages);
+        else showError('Error fetching messages: ' + response.error);
       })
       .withFailureHandler(error => {
-        showError('Connection error. Could not load messages.');
+        showError('Connection error.');
         console.error("getMessages failure:", error);
       })
       .getMessages();
   }
 
-  /**
-   * Handles sending a text message.
-   */
   function handleSendMessage() {
     const messageText = messageInput.value.trim();
     if (!messageText) return;
@@ -126,29 +100,26 @@
         if (response.ok) {
           messageInput.value = '';
           updateSendButtonState();
-          loadMessages(); // Immediately poll for the new message
+          loadMessages();
         } else {
           alert('Error: ' + response.error);
         }
         setSendingState(false);
       })
       .withFailureHandler(error => {
-        alert('A connection error occurred. Please try again.');
+        alert('Connection error. Please try again.');
         console.error('sendMessage failure:', error);
         setSendingState(false);
       })
       .sendMessage(userName, messageText);
   }
 
-  /**
-   * Handles the image selection and upload process.
-   */
   function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      alert("File is too large. Max size is 5MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File is too large (Max 5MB).");
       return;
     }
 
@@ -160,15 +131,12 @@
 
       google.script.run
         .withSuccessHandler(response => {
-          if (response.ok) {
-            loadMessages(); // Refresh to show the new image
-          } else {
-            alert('Upload Error: ' + response.error);
-          }
+          if (response.ok) loadMessages();
+          else alert('Upload Error: ' + response.error);
           setUploadingState(false);
         })
         .withFailureHandler(error => {
-          alert('A connection error occurred during upload.');
+          alert('Connection error during upload.');
           console.error('uploadImage failure:', error);
           setUploadingState(false);
         })
@@ -178,7 +146,6 @@
   }
 
   // --- UI Helper Functions ---
-
   function setSendingState(isSending) {
     messageInput.disabled = isSending;
     sendButton.disabled = isSending;
@@ -187,7 +154,6 @@
   function setUploadingState(isUploading) {
     imageButton.disabled = isUploading;
     imageButton.textContent = isUploading ? '...' : '+';
-    // Reset file input value to allow selecting the same file again
     imageInput.value = '';
   }
 
@@ -208,22 +174,19 @@
   sendButton.addEventListener('click', handleSendMessage);
   imageButton.addEventListener('click', () => imageInput.click());
   imageInput.addEventListener('change', handleImageUpload);
-
   messageInput.addEventListener('keypress', event => {
     if (event.key === 'Enter') {
-      event.preventDefault(); // Prevent new line in some browsers
+      event.preventDefault();
       handleSendMessage();
     }
   });
-
   messageInput.addEventListener('input', updateSendButtonState);
 
   // --- Initial Load & Polling ---
   document.addEventListener('DOMContentLoaded', () => {
     loadMessages();
-    pollingInterval = setInterval(loadMessages, 4000); // Poll every 4 seconds
-    updateSendButtonState(); // Initial state
-    messageInput.focus(); // Focus input on load
+    pollingInterval = setInterval(loadMessages, 4000);
+    updateSendButtonState();
+    messageInput.focus();
   });
-
 </script>
