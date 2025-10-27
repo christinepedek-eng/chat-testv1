@@ -105,13 +105,19 @@ function uploadImage(userName, fileInfo) {
 
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    // *** BUG FIX: Increased delay to 3 seconds for permissions to propagate. ***
-    // This provides a much safer window for Google Drive's systems to sync
-    // the file's sharing permissions before the link is used.
-    Utilities.sleep(3000); // Pause for 3 seconds
-
     const fileId = file.getId();
     const imageUrl = `https://drive.google.com/uc?id=${fileId}`;
+
+    // *** FINAL BUG FIX: Actively "wake up" the link. ***
+    // Instead of passively waiting, we actively fetch the URL's headers.
+    // This forces Google's servers to resolve the permissions immediately.
+    // We use `muteHttpExceptions` so if it fails, it doesn't stop the script.
+    try {
+      UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true });
+    } catch (e) {
+      // Log the error but continue, as the main goal was to trigger the URL.
+      Logger.log("Ignored UrlFetchApp error during link activation: " + e.toString());
+    }
 
     const sheet = getSheet();
     sheet.appendRow([ new Date(), userName, '', imageUrl ]);
