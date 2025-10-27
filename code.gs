@@ -35,10 +35,8 @@ function doGet(e) {
 function getSheet() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) {
-    // If the sheet doesn't exist, create it with a header row.
     const newSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(SHEET_NAME);
     newSheet.appendRow(['Timestamp', 'User', 'Message', 'Image Link']);
-    // Freeze the header row for better readability
     newSheet.setFrozenRows(1);
     return newSheet;
   }
@@ -56,11 +54,16 @@ function getMessages() {
     // Skip header row (i=0)
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
-      // Skip empty rows
       if (row.join('').trim() === '') continue;
 
+      // *** BUG FIX: Standardize the timestamp format ***
+      // Google Sheets can return dates in various formats.
+      // Converting to ISO string ensures a consistent format for the client-side JS.
+      const timestampValue = row[COL.TIMESTAMP - 1];
+      const timestamp = new Date(timestampValue).toISOString();
+
       messages.push({
-        timestamp: row[COL.TIMESTAMP - 1],
+        timestamp: timestamp, // Use the standardized ISO string timestamp
         user: row[COL.USER - 1],
         message: row[COL.MESSAGE - 1],
         imageLink: row[COL.IMAGELINK - 1]
@@ -81,10 +84,10 @@ function sendMessage(userName, messageText) {
   try {
     const sheet = getSheet();
     sheet.appendRow([
-      new Date(), // Timestamp
-      userName,   // User
-      messageText.trim(), // Message
-      ''          // ImageLink (empty for text messages)
+      new Date(),
+      userName,
+      messageText.trim(),
+      ''
     ]);
     return { ok: true };
   } catch (error) {
@@ -101,7 +104,6 @@ function uploadImage(userName, fileInfo) {
   try {
     const folder = DriveApp.getFolderById(IMAGE_FOLDER_ID);
     if (!folder) {
-      // This is a critical configuration error.
       Logger.log(`Critical Error: The folder with ID "${IMAGE_FOLDER_ID}" was not found.`);
       return { ok: false, error: 'Configuration error: Image folder not found.' };
     }
@@ -117,10 +119,10 @@ function uploadImage(userName, fileInfo) {
 
     const sheet = getSheet();
     sheet.appendRow([
-      new Date(), // Timestamp
-      userName,   // User
-      '',         // Message (empty for image messages)
-      imageUrl    // ImageLink
+      new Date(),
+      userName,
+      '',
+      imageUrl
     ]);
 
     return { ok: true, imageLink: imageUrl };
