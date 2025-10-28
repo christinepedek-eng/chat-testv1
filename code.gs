@@ -20,37 +20,16 @@ const USERS = {
 // ----- CORE FUNCTIONS -----
 // ---------------------------
 
+// doGet now only serves the chat page. No more routing.
 function doGet(e) {
-  if (e.parameter.image) {
-    return serveImage(e.parameter.image);
-  } else {
-    return serveChatPage();
-  }
-}
-
-function serveChatPage() {
   const userEmail = Session.getActiveUser().getEmail();
   const userName = USERS[userEmail] || userEmail;
 
   const tpl = HtmlService.createTemplateFromFile('chat');
   tpl.userName = userName;
-  // *** FINAL FIX: Pass the script URL to the template correctly ***
-  tpl.scriptUrl = ScriptApp.getService().getUrl();
-
   return tpl.evaluate()
     .setTitle('Chat App')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
-function serveImage(fileId) {
-  try {
-    const file = DriveApp.getFileById(fileId);
-    const blob = file.getBlob();
-    return ContentService.createOutput(blob).setMimeType(blob.getContentType());
-  } catch (error) {
-    Logger.log(`Error serving image ${fileId}: ${error.toString()}`);
-    return ContentService.createTextOutput('Image not found').setMimeType(ContentService.MimeType.TEXT);
-  }
 }
 
 function getSheet() {
@@ -64,6 +43,10 @@ function getSheet() {
   return sheet;
 }
 
+/**
+ * Gets messages and converts image IDs to Base64 Data URLs on the server.
+ * This is the definitive fix.
+ */
 function getMessages() {
   try {
     const sheet = getSheet();
@@ -76,12 +59,27 @@ function getMessages() {
       if (row.join('').trim() === '') continue;
 
       const timestamp = new Date(row[COL.TIMESTAMP - 1]).toISOString();
+      const imageId = row[COL.IMAGE_ID - 1];
+      let imageDataUrl = '';
+
+      // If there's an image ID, fetch the image and convert it to a Data URL.
+      if (imageId) {
+        try {
+          const imageFile = DriveApp.getFileById(imageId);
+          const blob = imageFile.getBlob();
+          const contentType = blob.getContentType();
+          const base64Data = Utilities.encodeBase64(blob.getBytes());
+          imageDataUrl = `data:${contentType};base64,${base64Data}`;
+        } catch (e) {
+          Logger.log(`Could not process image with ID ${imageId}: ${e.toString()}`);
+        }
+      }
 
       messages.push({
         timestamp: timestamp,
         user: row[COL.USER - 1],
         message: row[COL.MESSAGE - 1],
-        imageId: row[COL.IMAGE_ID - 1]
+        imageData: imageDataUrl // Send the Data URL to the client
       });
     }
     return { ok: true, messages: messages };
@@ -115,12 +113,12 @@ function uploadImage(userName, fileInfo) {
       return { ok: false, error: 'Configuration error: Image folder not found.' };
     }
 
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
     const decodedData = Utilities.base64Decode(fileInfo.fileData);
     const blob = Utilities.newBlob(decodedData, fileInfo.mimeType, fileInfo.fileName);
     const file = folder.createFile(blob);
     const fileId = file.getId();
+
+    // No sharing needed anymore. Just save the ID.
 
     getSheet().appendRow([ new Date(), userName, '', fileId ]);
 

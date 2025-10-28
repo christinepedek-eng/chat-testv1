@@ -10,8 +10,6 @@
   // --- State ---
   let lastRenderedTimestamp = null;
   let pollingInterval;
-  // *** FINAL FIX: Read the script URL safely from the HTML data attribute ***
-  const SCRIPT_URL = document.getElementById('scriptUrl').getAttribute('data-url');
 
   // --- Functions ---
 
@@ -50,9 +48,10 @@
         const msgElement = document.createElement('div');
         msgElement.classList.add('message');
 
-        if (msg.imageId) {
+        // *** FINAL FIX: Use the Base64 Data URL directly ***
+        if (msg.imageData) {
           const img = document.createElement('img');
-          img.src = SCRIPT_URL + '?image=' + msg.imageId;
+          img.src = msg.imageData; // The server now sends the full Data URL
           img.alt = 'User image';
           img.onerror = () => { img.alt = 'Image failed to load.'; };
           msgElement.appendChild(img);
